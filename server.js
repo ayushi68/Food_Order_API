@@ -6,34 +6,54 @@ const app = express();
 //     res.send("Server running and MySQL connected!");
 // });
 
-app.get("/search/dishes",async(req,res) => {
-    const {dish, minprice, maxprice} = req.query;
+app.get("/search/dishes", async (req, res) => {
+    const dish = req.query.dish || req.query.name;
+    const minprice = req.query.minprice || req.query.minPrice;
+    const maxprice = req.query.maxprice || req.query.maxPrice;
 
-    if(!dish || !minprice || !maxprice){
-        return res.status(400).json({error: "Enter valid Dish, minPrice, maxPrice"});
-    }
+    // if (!dish || !minprice || !maxprice) {
+    //     return res.status(400).json({ error: "Enter valid Dish, minPrice, maxPrice" });
+    // }
 
     const query = `
         SELECT 
-        r.id AS restaurant_id,
-        r.name AS restaurant_name,
-        SUM(o.quantity) AS total_orders
+            r.id AS restaurant_id,
+            r.name AS restaurant_name,
+            COALESCE(SUM(o.quantity), 0) AS total_orders
         FROM menu_items m
         JOIN restaurants r ON r.id = m.restaurant_id
-        JOIN orders o ON o.menu_item_id = m.id
-        WHERE m.name LIKE CONCAT('%', ?, '%')
-        AND m.price BETWEEN ? AND ?
+        LEFT JOIN orders o ON o.menu_item_id = m.id
+        WHERE 
+            m.name LIKE CONCAT('%', ?, '%')
+            AND m.price BETWEEN ? AND ?
         GROUP BY r.id
         ORDER BY total_orders DESC;
     `;
 
-    const values =  [dish, minprice, maxprice];
+    const [rows] = await db.execute("SELECT * FROM menu_items");
 
-    const[rows] = await db.execute(query, values);
-    console.log("DB Connected! Result:", rows)
+    return res.json(rows);
 
-    res.json(rows);
-})
+    // try {
+    //     const [rows] = await db.execute(query, [dish, minprice, maxprice]);
+    //     return res.json(rows);
+    // } catch (err) {
+    //     console.error(err);
+    //     return res.status(500).json({ error: "Database query failed" });
+    // }
+});
+
+// app.get("/test-db", async (req, res) => {
+//   try {
+//     const [rows] = await db.query("SELECT 1 AS test");
+//     console.log("DB RESULT:", rows);
+//     res.json(rows);
+//   } catch (err) {
+//     console.error("DB ERROR:", err);
+//     res.status(500).json({ error: err.code });
+//   }
+// });
+
 
 app.listen(3000, () => {
     console.log("Server started on http://localhost:3000");
